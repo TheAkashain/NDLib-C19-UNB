@@ -6,6 +6,8 @@ The NDLib simulation tests on Covid-19 done at UNB.
 - openpyxl
 - MatPlotLib
 - NDlib (install, then join with modified version in repository)
+- numpy
+- tqdm
 
 ## Custom Models
 If you just wish to get the custom disease models:
