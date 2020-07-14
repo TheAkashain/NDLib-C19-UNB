@@ -1,3 +1,0 @@
-1. CompuCanada (AceNet) Account for faster calculations
-2. Improved social network
-3. Contact tracing
