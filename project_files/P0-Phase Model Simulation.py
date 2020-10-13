@@ -9,22 +9,23 @@ from openpyxl import Workbook
 from openpyxl import load_workbook
 import NetworkGenerator as ng
 
-wb = Workbook()
-ws = wb.active
-wb.save('Test/Output3.xlsx')
+#wb = Workbook()
+#ws = wb.active
+path = 'P0-Phase Model Tests 5/Output.xlsx'
+#wb.save(path)
 
 #Choose day patient 0 is quarantined
 
-for days in range(0,15):
+for days in range(4,15):
     
     #Create XLSX file for data
-    wb = load_workbook(filename = 'Test/Output3.xlsx')
+    wb = load_workbook(filename = path)
     ws = wb.active
     
     #Start timer
     start_time = time.time()
     #Population
-    N = 50000
+    N = 20000
     #General connections
     connections = 12
     #Total number of days
@@ -34,11 +35,12 @@ for days in range(0,15):
     #Initial infected
     initialinfect = 1
     
+    
     print('-----Generating Custom graph with {} nodes, with {} connections-----'.format(N, connections))
-    filename  = "network1.txt"
-    ng.NetworkGenerator(filename, N)
-    g = nx.read_edgelist(filename)
-    #g= nx.barabasi_albert_graph(N, connections)
+    #filename  = "network1.txt"
+    #ng.NetworkGenerator(filename, N)
+    #g = nx.read_edgelist(filename)
+    g= nx.watts_strogatz_graph(N, connections, p=0.01)
     
     # Model Selection
     print('-----Configuring Model-----')
@@ -77,7 +79,7 @@ for days in range(0,15):
     
     # Simulation
     print('-----Doing {} simulation(s)-----'.format(executions))
-    trends = multi_runs(model, execution_number = executions, iteration_number = iterations, infection_sets=None)
+    trends = multi_runs(model, execution_number = executions, iteration_number = iterations, infection_sets=None, nprocesses = 8)
     
     #End timer, set total time
     stop_time = time.time()
@@ -115,7 +117,7 @@ for days in range(0,15):
     plt.figtext(0.55, 0.70, 'Outbreaks: {:.0f}\nMean: {:.3f}\nStDev: {:.3f}\nExecution Time: {:.3f}'.format(len(daydata), mean, stdev, total_time), 
             fontsize = 15, bbox = dict(boxstyle = 'round', facecolor = 'white'))
     plt.tight_layout()
-    plt.savefig("Test/(HIST)Patient 0 Test: {} People, {} Days Test, {} Days Total, {} Initial.png".format(N, days, iterations, initialinfect))
+    plt.savefig("P0-Phase Model Tests 5/(HIST)Patient 0 Test: {} People, {} Days Test, {} Days Total.png".format(N,  days, iterations))
     plt.clf()
     plt.close()
-    wb.save('Test/Output3.xlsx')
+    wb.save(path)
