@@ -88,16 +88,7 @@ class ASPhaseModel(DiffusionModel):
                     "descr": "Accuracy of disease tests",
                     "range": [0, 1],
                     "optional": False},
-                "crossing_num": {
-                    "descr": "Numer of people crossing per day, on average",
-                    "range": [0, float("inf")],
-                    "optional": False},
-                "importation": {
-                    "descr": "Probability of crossing being infected",
-                    "range": [0,float("inf")],
-                    "optional": False},
             },
-            
             "nodes": {
                 "Age": {
                     "descr": "Young = 0, Adult = 1, Senior = 2",
@@ -137,28 +128,16 @@ class ASPhaseModel(DiffusionModel):
 
         days = self.params['model']['days']
         pst = self.params['model']['pre-symp_time']
-
-        import_num_base = np.random.binomial(n = self.params['model']['crossing_num'], p = self.params['model']['importation'])
-        connections = 6
-        if( self.params['model']['phase'] == 1):
-            connections = connections/2
-            
-        import_num = import_num_base * connections
-        import_chance = import_num / len(actual_status)
-
-        eventp_base = np.random.random_sample(len(actual_status) * 2)
-        eventp_count = 0
         
         #This code runs for every node on the graph
         for u in self.graph.nodes:
             u_status = self.status[u]
-
-            if u_status != 0: 
+            
+            if u_status != 0:
                 #For exposed individuals, they have a random chance of becoming pre-symptomatic,
                 #based on the model parameter 'alpha'.
                 if u_status == 1: #Exposed
-                    eventp = eventp_base[eventp_count]
-                    eventp_count = eventp_count + 1
+                    eventp = np.random.random_sample()
                     if eventp < self.params['model']['alpha']:
                         actual_status[u] = 8
                         self.progress[u] = 1
@@ -167,113 +146,107 @@ class ASPhaseModel(DiffusionModel):
                 #or asymptomatic, defined by eventp for transition, and by randtest
                 #for which compartment they move to. They also are just as infective as asymptomatic
                 #individuals, but only are pre-symptomatic for "pre-symp_time" days.
-                elif (u_status == 8):
-                    neighbors = self.graph.neighbors(u)
-                    actual_status = self.infect(u, u_status, neighbors, actual_status)
-                    
-                    if self.progress[u] < pst:
-                        self.progress[u] += 1
+            elif (u_status == 8):
+                neighbors = self.graph.neighbors(u)
+                actual_status = self.infect(u, u_status, neighbors, actual_status)
+                
+                if self.progress[u] < pst:
+                    self.progress[u] += 1
+                else:
+                    randtest = np.random.random_sample()
+                    if (randtest < self.params['model']['asymp_chance']):
+                        actual_status[u] = 3 #Asymtomatic
+                        self.progress[u] = 0
                     else:
-                        randtest = eventp_base[eventp_count]
-                        eventp_count = eventp_count + 1
-                        if (randtest < self.params['model']['asymp_chance']):
-                            actual_status[u] = 3 #Asymtomatic
-                            self.progress[u] = 0
-                        else:
-                            actual_status[u] = 2 #Symptomatic (infected)
-                            self.progress[u] = 0
+                        actual_status[u] = 2 #Symptomatic (infected)
+                        self.progress[u] = 0
                             
                 #For symptomatic (infected) individuals, they have a random chance to be removed,
                 #and also a random chance to be tested (which allows for contact tracing). This
                 #could be easily modified to make testing more likely based on phase.
-                elif (u_status == 2): #Symptomatic
+            elif (u_status == 2): #Symptomatic
                     neighbors = self.graph.neighbors(u)
                     actual_status = self.infect(u, u_status, neighbors, actual_status)
                     
                     randtest = np.random.random_sample()
-                    eventp = eventp_base[eventp_count]
-                    eventp_count = eventp_count + 1
+                    eventp = np.random.random_sample()
                     if eventp < self.params['model']['gamma']:
                         actual_status[u] = 4 #Removed
                         self.progress[u] = 0
                     elif randtest < self.params['model']['symp_test']:
                         actual_status[u] = 5 #Tested
                         self.progress[u] = 0
-                    
+                        
                 #For asymptomatic individuals, they have a random chance to be removed. They are 
                 #also 1/3 as infective as symptomatic individuals.
-                elif (u_status == 3): #Asymptomatic
-                    neighbors = self.graph.neighbors(u)
-                    actual_status = self.infect(u, u_status, neighbors, actual_status) 
-                    
-                    eventp = eventp_base[eventp_count]
-                    eventp_count = eventp_count + 1
-                    if eventp < self.params['model']['gamma']:
-                        actual_status[u] = 4 #Removed
-                        self.progress[u] = 0
+            elif (u_status == 3): #Asymptomatic
+                neighbors = self.graph.neighbors(u)
+                actual_status = self.infect(u, u_status, neighbors, actual_status) 
+
+                eventp = np.random.random_sample()
+                if eventp < self.params['model']['gamma']:
+                    actual_status[u] = 4 #Removed
+                    self.progress[u] = 0
                         
                 #For tested invidiuals (specifically meaning they tested positive), their 
                 #edge-neighbors are also all tested after X days.
-                elif (u_status == 5): #Tested
-                    if self.progress[u] < 1:
-                        self.progress[u] += 0.25
-                        
-                    elif self.progress[u] < 2:
-                        neighbors = self.graph.neighbors(u)
-                        for v in neighbors: 
-                            if (self.status[v] == 2 or self.status[v] == 3 or self.status[v] == 7 or self.status[v] == 8):
-                                ranvar = np.random.random_sample()
-                                if ranvar <= self.params['model']['test_chance']:
-                                    actual_status[v] = 5 #Tested
-                                    self.progress[v] = 0
-                        self.progress[u] = 2
+            elif (u_status == 5): #Tested
+                if self.progress[u] < 1:
+                    self.progress[u] += 0.25
+                    
+                elif self.progress[u] < 2:
+                    neighbors = self.graph.neighbors(u)
+                    for v in neighbors: 
+                        if (self.status[v] == 2 or self.status[v] == 3 or self.status[v] == 7 or self.status[v] == 8):
+                        ranvar = np.random.random_sample()
+                        if ranvar <= self.params['model']['test_chance']:
+                            actual_status[v] = 5 #Tested
+                            self.progress[v] = 0
+                            self.progress[u] = 2
+                                
+                            eventp = np.random.random_sample()
+                            if eventp < self.params['model']['gamma']:
+                                actual_status[u] = 6 #Tested Removed
                                     
-                    eventp = eventp_base[eventp_count]
-                    eventp_count = eventp_count + 1
-                    if eventp < self.params['model']['gamma']:
-                        actual_status[u] = 6 #Tested Removed
-                                        
                 #This code allows for a tested person to heal, while still having their
                 #edge-neighbors tested after X days.
-                elif (u_status == 6): #Tested Removed
-                    if self.progress[u] < 1:
-                        self.progress[u] += 0.25
+            elif (u_status == 6): #Tested Removed
+                if self.progress[u] < 1:
+                    self.progress[u] += 0.25
                         
-                    elif self.progress[u] < 2:
-                        neighbors = self.graph.neighbors(u)
-                        for v in neighbors: 
-                            if (self.status[v] == 2 or self.status[v] == 3 or self.status[v] == 7 or self.status[v] == 8):
-                                ranvar = eventp_base[eventp_count]
-                                eventp_count = eventp_count + 1
-                                if ranvar <= self.params['model']['test_chance']:
-                                    actual_status[v] = 5 #Tested
-                                    self.progress[v] = 0
-                        self.progress[u] = 2
-                                    
-                elif (u_status == 7):
+                elif self.progress[u] < 2:
                     neighbors = self.graph.neighbors(u)
-                    actual_status = self.infect(u, u_status, neighbors, actual_status)
+                    for v in neighbors: 
+                        if (self.status[v] == 2 or self.status[v] == 3 or self.status[v] == 7 or self.status[v] == 8):
+                            ranvar = np.random.random_sample()
+                            if ranvar <= self.params['model']['test_chance']:
+                                actual_status[v] = 5 #Tested
+                                self.progress[v] = 0
+                                self.progress[u] = 2
+                                    
+            elif (u_status == 7):
+                neighbors = self.graph.neighbors(u)
+                actual_status = self.infect(u, u_status, neighbors, actual_status)
+                
+                try:
+                    self.progress[u]
+                except KeyError:
+                    self.progress[u] = 0
                     
-                    try:
-                        self.progress[u]
-                    except KeyError:
-                        self.progress[u] = 0
+                if self.progress[u] < days:
+                    self.progress[u] += 1
+                else:
+                    actual_status[u] = 5  # Tested
+                    self.progress[u] = 0
                         
-                    if self.progress[u] < days:
-                        self.progress[u] += 1
-                    else:
-                        actual_status[u] = 5  # Tested
-                        self.progress[u] = 0
-
-            elif u_status == 0:
-                eventp = eventp_base[eventp_count]
-                eventp_count = eventp_count + 1
-                if eventp < import_chance:
-                    eventp2 = np.random.random_sample()
-                    if eventp2 < self.params['model']['beta']*0.33:
-                        actual_status[u] = 1
-                        self.progress[u] = 0
-                        
+        #This code block allows for random testing of individuals, as is done in some countries.
+        #If this is not wanted, set rand_test_count to 0.
+        #random_tests = np.floor(np.random.random_sample(self.params['model']['rand_test_count'])*len(self.graph.nodes))
+        #for u in random_tests:
+        #    if (actual_status[u] == 2 or actual_status[u] == 3 or actual_status[u] == 7 or actual_status[u] == 8):
+        #        actual_status[u] = 5 #Tested
+        #        self.progress[u] = 0
+        
         #All the data is saved in these blocks, and time is moved forwards 1 day
         delta, node_count, status_delta = self.status_delta(actual_status)
         self.status = actual_status
@@ -295,7 +268,6 @@ class ASPhaseModel(DiffusionModel):
         else:
             return {"iteration": self.actual_iteration - 1, "status": {},
                     "node_count": node_count.copy(), "status_delta": status_delta.copy()}
-
         
     def infect(self, u, u_status, neighbors, actual_status):
         if (u_status == 3 or u_status == 8):
@@ -305,8 +277,8 @@ class ASPhaseModel(DiffusionModel):
             
         if (self.params['model']['phase'] == 0):
             #print("Phase 0 - Infect")
-            infect_mod = main_infect_mod * self.params['nodes']['Age'][u]
             for v in neighbors:
+                infect_mod = main_infect_mod * self.params['nodes']['Age'][v]
                 if self.status[v] == 0:
                     ranvar = np.random.random_sample()
                     if ranvar < self.params['model']['beta']*infect_mod:
@@ -315,44 +287,44 @@ class ASPhaseModel(DiffusionModel):
                         
         elif (self.params['model']['phase'] == 1):
             #print("Phase 1 - Infect")
-            infect_mod = main_infect_mod * self.params['nodes']['Age'][u]
             for v in neighbors:
+                infect_mod = main_infect_mod * self.params['nodes']['Age'][v]
                 if self.status[v] == 0:
                     if (u,v) in self.params['edges']['Phase Requirement']:
                         if self.params['edges']['Phase Requirement'][(u,v)] >= 0.5:
                             ranvar = np.random.random_sample()
                             if ranvar  < self.params['model']['beta']*infect_mod:
                                 actual_status[v] = 1
-                                self.progress[v] = 0
+                                self.progress[v] = 1
                     elif (v, u) in self.params['edges']['Phase Requirement']:
                          if self.params['edges']['Phase Requirement'][(v,u)] >= 0.5:
-                            ranvar = np.random.random_sample()
+                             ranvar = np.random.random_sample()
                             if ranvar  <  self.params['model']['beta']*infect_mod:
                                 actual_status[v] = 1
-                                self.progress[v] = 0
+                                self.progress[v] = 1 
                                 
         elif (self.params['model']['phase'] == 2):
             #print("Phase 2 - Infect")
-            infect_mod = main_infect_mod * self.params['nodes']['Age'][u]
             for v in neighbors:
+                infect_mod = main_infect_mod * self.params['nodes']['Age'][v]
                 if self.status[v] == 0:
                     if (u,v) in self.params['edges']['Phase Requirement']:
                         if self.params['edges']['Phase Requirement'][(u,v)] == 1:
                             ranvar = np.random.random_sample()
                             if ranvar < self.params['model']['beta']*infect_mod:
                                 actual_status[v] = 1
-                                self.progress[v] = 0
+                                self.progress[v] = 1
                     elif (v, u) in self.params['edges']['Phase Requirement']:
                          if self.params['edges']['Phase Requirement'][(v,u)] == 1:
-                            ranvar = np.random.random_sample()
+                             ranvar = np.random.random_sample()
                             if ranvar < self.params['model']['beta']*infect_mod:
                                 actual_status[v] = 1
-                                self.progress[v] = 0
+                                self.progress[v] = 1 
                                 
         else:
             #print("Phase X - Infect")
-            infect_mod = main_infect_mod * self.params['nodes']['Age'][u]
             for v in neighbors:
+                infect_mod = main_infect_mod * self.params['nodes']['Age'][v]
                 if self.status[v] == 0:
                     ranvar = np.random.random_sample()
                     if ranvar < self.params['model']['beta']*infect_mod:

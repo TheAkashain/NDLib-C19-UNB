@@ -1,26 +1,29 @@
+import os
+import sys
+sys.path.insert(1, "../")
+
 import networkx as nx
 import ndlib.models.ModelConfig as mc
 from ndlib.utils import multi_runs
 import time
-import ndlib.models.epidemics.ASPhaseModel as p0
+from ndlib.models.epidemics.ASPhaseModel import ASPhaseModel as p0
 import numpy as np
 from openpyxl import Workbook
 from openpyxl import load_workbook
-import os
 
-if os.getcwd() != "/home/theakashain/Documents/Summer Employment/COVID-19 Research/Python/":
-    os.chdir("/home/theakashain/Documents/Summer Employment/COVID-19 Research/Python/")
-filepath = 'ASPT Model Tests 4/Output.xlsx'
+if os.getcwd() != "/home/theakashain/Documents/Co-Op/COVID-19 Research/NDLib-C19-UNB/project_files/":
+    os.chdir("/home/theakashain/Documents/Co-Op/COVID-19 Research/NDLib-C19-UNB/project_files/")
+filepath = 'Test/Output3.xlsx'
 #Create XLSX file
-#wb = Workbook()
-#ws = wb.active
-#wb.save(filepath)
+wb = Workbook()
+ws = wb.active
+wb.save(filepath)
    
 #Load XLSX file
 wb = load_workbook(filename = filepath)
 ws = wb.active
 
-for test_chance in [0.7]:
+for test_chance in [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]:
     #Start timer
     start_time = time.time()
     #Population
@@ -36,7 +39,7 @@ for test_chance in [0.7]:
     #What day the test is at
     days = 7
     
-    print('-----Generating Network With {} Nodes and {} Connections-----'.format(N, connections))
+    print('-----Generating Network With {} Nodes and {} Connections at Test Chance {}-----'.format(N, connections, test_chance))
     import NetworkGenerator as ng
     filename  = "connection_network.txt"
     filename2 = "age_network.txt"
@@ -75,6 +78,8 @@ for test_chance in [0.7]:
     cfg.add_model_parameter('days', days) #Day patient 0 is quarantined
     cfg.add_model_parameter("pre-symp_time", 2)
     cfg.add_model_parameter("test_chance", test_chance)
+    cfg.add_model_parameter("crossing_num", 1000)
+    cfg.add_model_parameter("importation", 0.0016)
     
     #Give each edge a property of only yellow, only orange and yellow, or all phases
     for i in G.edges():
@@ -101,7 +106,7 @@ for test_chance in [0.7]:
     total_time = stop_time - start_time
     print('----- Total Time: {} seconds ----'.format(total_time))
     
-    print('-----Plotting Results-----\n')
+    print('----- Saving Results-----\n')
     
     #Store data from testing data in "daydata" array
     daydata = []  #Total Infected
