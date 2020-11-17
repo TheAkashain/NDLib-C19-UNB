@@ -13,17 +13,17 @@ from openpyxl import load_workbook
 
 if os.getcwd() != "/home/theakashain/Documents/Co-Op/COVID-19 Research/NDLib-C19-UNB/project_files/":
     os.chdir("/home/theakashain/Documents/Co-Op/COVID-19 Research/NDLib-C19-UNB/project_files/")
-filepath = 'Test/Output3.xlsx'
+filepath = 'Test/Output4.xlsx'
 #Create XLSX file
-wb = Workbook()
-ws = wb.active
-wb.save(filepath)
+#wb = Workbook()
+#ws = wb.active
+#wb.save(filepath)
    
 #Load XLSX file
 wb = load_workbook(filename = filepath)
 ws = wb.active
 
-for test_chance in [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]:
+for cross_num in [0]:
     #Start timer
     start_time = time.time()
     #Population
@@ -39,7 +39,7 @@ for test_chance in [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]:
     #What day the test is at
     days = 7
     
-    print('-----Generating Network With {} Nodes and {} Connections at Test Chance {}-----'.format(N, connections, test_chance))
+    print('-----Generating Network With {} Nodes and {} Connections at Travel {}-----'.format(N, connections, cross_num))
     import NetworkGenerator as ng
     filename  = "connection_network.txt"
     filename2 = "age_network.txt"
@@ -77,8 +77,8 @@ for test_chance in [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]:
     cfg.add_model_parameter('rand_test_count', 20) #Number of random tests per day
     cfg.add_model_parameter('days', days) #Day patient 0 is quarantined
     cfg.add_model_parameter("pre-symp_time", 2)
-    cfg.add_model_parameter("test_chance", test_chance)
-    cfg.add_model_parameter("crossing_num", 1000)
+    cfg.add_model_parameter("test_chance", 0.9)
+    cfg.add_model_parameter("crossing_num", cross_num)
     cfg.add_model_parameter("importation", 0.0016)
     
     #Give each edge a property of only yellow, only orange and yellow, or all phases
@@ -127,19 +127,19 @@ for test_chance in [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]:
                               trends[n]['trends']['node_count'][6][-1])
     
     #Save data in XLSX file
-    dayscol = (test_chance*10)*5-4
-    totalcol = (test_chance*10)*5-3
-    infectcol = (test_chance*10)*5-2
-    testedcol = (test_chance*10)*5-1
+    dayscol = (cross_num/250)*5+1
+    totalcol = (cross_num/250)*5+2
+    infectcol = (cross_num/250)*5+3
+    testedcol = (cross_num/250)*5+4
     
-    ws.cell(1, dayscol, "Test Chance")
+    ws.cell(1, dayscol, "Crossing Num")
     ws.cell(1, totalcol, "Total Infected")
     ws.cell(1, infectcol, "Number Infected at Day 30")
     ws.cell(1, testedcol, "Number Tested at Day 30")
     
     row = 2
     for item in range(0,len(daydata)):
-        ws.cell(row, dayscol, test_chance)
+        ws.cell(row, dayscol, cross_num)
         row += 1
     row = 2
     for item in daydata:
