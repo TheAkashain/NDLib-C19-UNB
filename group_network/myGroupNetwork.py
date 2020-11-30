@@ -22,33 +22,22 @@ class myGroupNetwork():
             for i in self.groups['AgeLevel'][c]:
                 self.nodes[i]['AgeLevel'] = c
     
-    def addGroup(self, groupType, n, size, exclude=[], contactPercentage=1):
+    def addGroup(self, groupType, numUnits, size, exclude=[], contactPercentage=1):
         if isinstance(size, int):
-            # eligible = set(range(len(self.nodes)))
-            # for x in exclude:
-            #     for y in self.groups[x].values():
-            #         eligible.difference( set(y) )
-            # eligible = list(eligible)
             eligible = [ u for u,d in enumerate(self.nodes) if not any(x in d for x in exclude) ]
-            draw = random.choices( eligible, k=n*size)
+            draw = random.choices( eligible, k=numUnits*size)
+            for j in range(numUnits): # The j-th unit
+                start, end = j * size, (j+1) * size
+                self.groups[groupType][j] = draw[start:end]
         else: # Age is specified in size
             draw = dict() # Draw people in each age group
             for c, val in size.items():
-                # eligible = set( self.groups['AgeLevel'][c] )
-                # for x in exclude:
-                #     for y in self.groups[x].values():
-                #         eligible.difference( set(y) )
-                # eligible = list(eligible)
                 eligible = [ u for u in self.groups['AgeLevel'][c] if not any(x in self.nodes[u] for x in exclude) ]
-                draw[c] = random.choices(eligible, k=val*n)
-        for j in range(n): # The j-th unit
-            if isinstance(size, int):
-                start, end = j * size, (j+1) * size
-                self.groups[groupType][j] = draw[start:end]
-            else:
-                for c, val in size.items():
+                draw[c] = random.choices(eligible, k=val*numUnits)
+            for j in range(numUnits): # The j-th unit
                     start, end = j * val, (j+1) * val
                     self.groups[groupType][j].extend( draw[c][start:end] )
+        for j in range(numUnits): # The j-th unit
             for i in self.groups[groupType][j]:
                 self.nodes[i][groupType] = j
             edgesAll = list(itertools.combinations( self.groups[groupType][j], 2))
@@ -61,10 +50,3 @@ class myGroupNetwork():
         if '.json' not in filename: filename += '.json'
         with open( filename, 'w') as file:
             json.dump( (nodeList, self.groups, edgeList), file)
-
-    # def save(self, nodeFilename, edgeFilename):
-    #     df = pd.DataFrame.from_dict( self.nodes )
-    #     df.to_csv( nodeFilename + 'csv', index=False)
-    #     edgeList = [(a,b,self.edgeWeights[(a,b)]) for a, b in self.edgeWeights]
-    #     with open( nodeFilename + '.json', 'w') as file:
-    #         json.dump(edgeList, file)

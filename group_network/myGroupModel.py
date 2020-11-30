@@ -1,6 +1,3 @@
-# from ndlib.models.DiffusionModel import DiffusionModel
-# import numpy as np
-# import future.utils
 import random
 import json
 import pandas
@@ -12,16 +9,23 @@ class myGroupModel():
        Track and Iterate Network
     """
 
-    def __init__(self, filename):
+    def __init__(self, filename, basePercentage=.05):
         """
-            :param labels: A cvs file for pandas dataframe
-            :param edges: 
-         """
-        g = nx.erdos_reny(p=.1)
+            :param filenam: A json file
+            :param basePercentage: Percentage of edges in initial network
+        """
         if '.json' not in filename: filename += '.json'
         with open(filename, 'r') as file:
             nodeList, groups, edgeList = json.load(file)
-        g.add_nodes_from( nodeList )
+        if basePercentage > 0:
+            g = nx.erdos_renyi_graph( n=len(nodeList), p=basePercentage )
+            for i,d in nodeList:
+                g.nodes[i].update(d)
+            for e in g.edges:
+                g.edges[e]['weight'] = 1
+        else:
+            g = nx.Graph()
+            g.add_nodes_from( nodeList )
         g.add_weighted_edges_from( edgeList )
         self.graph = g
         self.groups = groups
@@ -47,60 +51,92 @@ class myGroupModel():
             'gammaD': 0.01,
         }
 
+        self.Lists = defaultdict(list) # Lists of L, I, A and Vulnerable
+
     def initialize(self, percentageInfected):
         self.iter = 0
         N = len(self.graph.nodes)
         lst = list(range(N))
         for i in lst:
             self.graph.nodes[i]['Status'] = 'S'
+            self.graph.nodes[i]['numNeighbor'] = defaultdict(int)
         n = int(N * percentageInfected)
         subList = random.choices(lst, k=n)
         for i in subList:
             self.graph.nodes[i]['Status'] = 'L'
+            self.Lists['L'].append(i)
+        vulnerable = set()
+        for i in subList:
+            for j in self.graph.neighbors(i):
+                if self.graph.nodes[j]['Status'] == 'S':
+                    vulnerable.add(j)
+                    self.graph.nodes[j]['numNeighbor']['L'] += 1
+        self.Lists['Vulnerable'] = list(vulnerable)
+        self.iter = 0
 
     def iteration(self):
         """
         Execute a single model iteration
         """
         self.iter += 1
-
-        nextStatus = dict()
         g = self.graph
 
-        # Similar to NDLib
-        for id, u in self.graph.nodes.items():
+        nextStatus = dict()
+        nextLists = defaultdict(list) # Lists of L, I, A and Vulnerable
+
+        for i in self.Lists['Vulnerable']:
 
             eventp = random.random()
-            neighbors = self.graph.neighbors(id)
-            
-            if u['Status'] == 'S':
-                neighborsL = [v for v in neighbors if g.nodes[v]['Status'] == 'L']
-                neighborsI = [v for v in neighbors if g.nodes[v]['Status'] == 'I']
-                neighborsA = [v for v in neighbors if g.nodes[v]['Status'] == 'A']
 
-                e = len(neighborsI) + .5 * len(neighborsL) + .3 * len(neighborsA)
-                if eventp < 1 - (1 - self.params['beta']) ** e:
-                    u['Status'] = 'L'
-                        
-            elif u['Status'] == 'L':
-                if eventp < self.params['gammaI']:
-                    nextStatus[id] = 'I'
-                elif eventp < self.params['gammaI'] + self.params['gammaA']:
-                    nextStatus[id] = 'A'
+            u = self.graph.nodes[i]
 
-            elif u['Status'] == 'I':
-                if eventp < self.params['gammaRI']:
-                    nextStatus[id] = 'RI'
-                elif eventp < self.params['gammaRI'] + self.params['gammaD']:
-                    nextStatus[id] = 'D'
+            e = u['numNeighbor']['I'] + .5 * u['numNeighbor']['L'] + .3 * u['numNeighbor']['A']
+            if eventp < 1 - (1 - self.params['beta']) ** e:
+                u['Status'] = 'L'
+                nextLists['L'].append(i)
 
-            elif u['Status'] == 'A':
-                if eventp < self.params['gammaRA']:
-                    nextStatus[id] = 'RA'
+            u['numNeighbor'] = defaultdict(int)
+
+        for i in self.Lists['L']:
+            eventp = random.random()
+            if eventp < self.params['gammaI']:
+                nextStatus[i] = 'I'
+                nextLists['I'].append(i)
+            elif eventp < self.params['gammaI'] + self.params['gammaA']:
+                nextStatus[i] = 'A'
+                nextLists['A'].append(i)
+            else:
+                nextLists['L'].append(i)
+
+        for i in self.Lists['I']:
+            eventp = random.random()
+            if eventp < self.params['gammaRI']:
+                nextStatus[i] = 'RI'
+            elif eventp < self.params['gammaRI'] + self.params['gammaD']:
+                nextStatus[i] = 'D'
+            else:
+                nextLists['I'].append(i)
+
+        for i in self.Lists['A']:
+            eventp = random.random()
+            if eventp < self.params['gammaRA']:
+                nextStatus[i] = 'RA'
+            else:
+                nextLists['A'].append(i)
 
         # Update Information
-        for id in nextStatus:
-            g.nodes[id]['Status'] = nextStatus[id]
+        for i in nextStatus:
+            g.nodes[i]['Status'] = nextStatus[i]
+
+        vulnerable = set()
+        for c in ['L','I','A']:
+            for i in self.Lists[c]:
+                for j in self.graph.neighbors(i):
+                    if self.graph.nodes[j]['Status'] == 'S' and self.graph.edges[(i,j)]['weight'] > 0:
+                        vulnerable.add(j)
+                        self.graph.nodes[j]['numNeighbor'][c] += self.graph.edges[(i,j)]['weight']
+        nextLists['Vulnerable'] = list(vulnerable)
+        self.Lists = nextLists
     
     def record(self, trend, trendByGroup=None, gTypes=None):
         nodesByStatus = dict()
@@ -125,6 +161,7 @@ class myGroupModel():
                 self.graph.nodes[u]['Status'] = 'L'
             else:
                 self.graph.nodes[u]['Status'] = 'S'
+                self.graph.nodes[u]['numNeighbor'] = defaultdict(int)
             nodeContact = random.choices(nodesOld, k=contact)
             for v in nodeContact:
                 self.graph.add_edge(u,v)
@@ -136,6 +173,6 @@ class myGroupModel():
                 self.graph.edges[e]['weight'] += weight
             else:
                 self.graph.add_edge(*e,weight=weight)
-            if self.graph.edges[e]['weight'] == 0:
-                self.graph.remove_edge(*e)
+            # if self.graph.edges[e]['weight'] == 0:
+            #     self.graph.remove_edge(*e)
         return None
