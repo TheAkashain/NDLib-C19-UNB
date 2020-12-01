@@ -16,7 +16,6 @@ The new features are:
 - Adding nodes and edges during between iterations, which is capable of simulating effects of importation and gathering under endemic.
 - Breadth First Search (BFS). __To-Do__
 
-
 ## Requirement
 
 Use the package manager [pip](https://pip.pypa.io/en/stable/) to install NetWorkX.
@@ -27,10 +26,16 @@ pip install networkx
 
 ## Usage
 
-To build network (see GroupNetwork_Build.ipynb for more details):
+The demo file *GroupNetwork_Run.ipynb*
+was written in Jupyter Notebook,
+which can be run in
+[Anaconda](https://www.anaconda.com/products/individual).
+
+
+To build network (see GroupNetwork_Run.ipynb for more details):
 
 ```python
-from myGroupNetwork import myGroupNetwork
+import myGroupNetwork
 
 # Set parameters
 N = 2000 # Total Population
@@ -42,23 +47,17 @@ oldPercent = 1 - youngPercent - adultPercent # = 0.20
 nYoung = int(youngPercent * N)
 nMiddle = int(adultPercent * N)
 nSenior = N - nYoung - nMiddle
-data = myGroupNetwork(size={'Young': nYoung, 'Middle': nMiddle, 'Senior': nSenior})
+data = myGroupNetwork.buildGroups(size={'Young': nYoung, 'Middle': nMiddle, 'Senior': nSenior})
 
 # Add groups
 data.addGroup(groupType='CareHome', n=60, size={'Middle':20, 'Senior': 30}, contactPercentage=.7)
 
-# Save result
+# Save group data
 data.save( filename='network_data.json' )
-```
-
-To run simulation (see GroupNetwork_Simulation.ipynb for details):
-
-```python
-from myGroupModel import myGroupModel
 
 # Load data and build network
 filename = 'network_data.json'
-model = myGroupModel( filename )
+model = myGroupModel.buildNetwork( filename )
 ```
 
 ## Contributing
