@@ -14,7 +14,8 @@ The new features are:
 
 - Age structure and group labels.
 - Adding nodes and edges during between iterations, which is capable of simulating effects of importation and gathering under endemic.
-- Breadth First Search (BFS). __To-Do__
+- Breadth First Search (BFS). Instead of visiting all nodes in each iteration,
+only infected and vulnerable nodes are visited.
 
 ## Requirement
 
@@ -59,6 +60,10 @@ data.save( filename='network_data.json' )
 filename = 'network_data.json'
 model = myGroupModel.buildNetwork( filename )
 ```
+
+Sample output:
+
+![Large Gathering](output/fig_large_gathering.png)
 
 ## Contributing
 UNB and GNB
