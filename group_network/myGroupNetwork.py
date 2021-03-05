@@ -1,10 +1,14 @@
-from collections import defaultdict
 import random
 import itertools
 import json
 import networkx as nx
+import csv
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+from collections import defaultdict
 
-class buildGroups():
+class NetworkGenerator():
     """
        Build Network with group labels
     """
@@ -51,7 +55,7 @@ class buildGroups():
         with open( filename, 'w') as file:
             json.dump( (nodeList, self.groups, edgeList), file)
 
-class buildNetwork():
+class NetworkModel():
     """
        Track and Iterate Network
     """
@@ -229,7 +233,6 @@ class buildNetwork():
                         self.Lists['Vulnerable'].append(j)
             edgeList = [(i,j,1) for j in nodeContact ]
             self.graph.add_weighted_edges_from( edgeList )
-        return None
     
     def addContacts(self, edgeList, weight=1):
         for e in edgeList:
@@ -239,4 +242,53 @@ class buildNetwork():
                 self.graph.add_edge(*e,weight=weight)
             # if self.graph.edges[e]['weight'] == 0:
             #     self.graph.remove_edge(*e)
-        return None
+    
+    def gathering_one(self, days, sz, num):
+        self.initialize()
+        nodeList = list(self.graph.nodes.keys())
+        for _ in range(days):
+            draw = random.choices(nodeList, k=sz*num)
+            count = 0
+            edgeList = []
+            for _ in range(num):
+                members = draw[count: count+sz]
+                edgeList += list( itertools.combinations( members, 2) )
+                count += sz
+            self.addContacts(edgeList, 1)
+            self.iteration()
+            self.addContacts(edgeList, -1)
+        return self.trend['I'][:]
+
+    def gathering_simulation(self, days=10, sizes=[50,70,90], num_events=[10,20,30], filename='gathering_simulation.csv'):
+        with open(filename, 'w') as csvfile:
+            fwriter = csv.writer(csvfile)
+            header = ['Size', 'Number_of_Events', 'Trend']
+            fwriter.writerow(header)
+            for sz in sizes:
+                for num in num_events:
+                    print(f'Simuating for size={sz} and num_events={num}', end='... ')
+                    trend = self.gathering_one(days, sz, num)
+                    st_trend = '[' + '|'.join(map(str,trend)) + ']'
+                    row = [sz, num, st_trend]
+                    fwriter.writerow(row)
+                    print('Done')
+
+    def gathering_plot(self, sizes=[50, 70], num_events=[10,20,30], filename='gathering_simulation.csv'):
+        plt.subplots(figsize=(10,6))
+        with open(filename, 'r') as csvfile:
+            freader = csv.reader(csvfile)
+            next(freader)
+            grid = defaultdict(lambda: defaultdict(int))
+            for row in freader:
+                sz = int(row[0])
+                num = int(row[1])
+                trend = eval(row[2].replace('|',','))
+                grid[sz][num] = max(trend)
+        outbreaks = np.array([[grid[sz][num] for num in num_events] for sz in sizes])
+        sns.heatmap(outbreaks, cmap='hot')
+
+if __name__ == '__main__':
+    model = NetworkModel('output/network_data.json')
+    # model.gathering_simulation()
+    model.gathering_plot()
+    
