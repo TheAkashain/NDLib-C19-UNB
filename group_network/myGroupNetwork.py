@@ -290,7 +290,7 @@ class NetworkModel():
                 grid[sz][num] = max(trend)
         sizes = sorted(sz_set)
         num_events = sorted(num_set, reverse=True)
-        outbreaks = np.array([[grid[sz][num] for num in num_events] for sz in sizes])
+        outbreaks = np.array([[grid[sz][num] for sz in sizes] for num in num_events])
         plt.subplots(figsize=(10,6))
         ax = sns.heatmap(outbreaks, cmap='coolwarm')
         plt.xlabel('Event Sizes')
