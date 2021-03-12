@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from collections import defaultdict
+from multiprocessing import Pool
 
 class NetworkGenerator():
     """
@@ -132,7 +133,7 @@ class NetworkModel():
         self.trend['S'] = [ N - numCases ]
         self.trendByGroup = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
 
-    def iteration(self, gTypes=None ):
+    def iteration(self, gTypes=None):
         """
         Execute a single model iteration
         """
@@ -243,7 +244,8 @@ class NetworkModel():
             # if self.graph.edges[e]['weight'] == 0:
             #     self.graph.remove_edge(*e)
     
-    def gathering_one(self, days, sz, num):
+    def gathering_one(self, x):
+        days, sz, num = x
         self.initialize()
         nodeList = list(self.graph.nodes.keys())
         for _ in range(days):
@@ -260,35 +262,46 @@ class NetworkModel():
         return self.trend['I'][:]
 
     def gathering_simulation(self, days=10, sizes=[50,70,90], num_events=[10,20,30], filename='gathering_simulation.csv'):
+        sizes_and_nums = [(days,sz,num) for sz in sizes for num in num_events]
+        with Pool() as p: # Multi-processing
+            trendAll = p.map(self.gathering_one, sizes_and_nums)
         with open(filename, 'w') as csvfile:
             fwriter = csv.writer(csvfile)
             header = ['Size', 'Number_of_Events', 'Trend']
             fwriter.writerow(header)
-            for sz in sizes:
-                for num in num_events:
-                    print(f'Simuating for size={sz} and num_events={num}', end='... ')
-                    trend = self.gathering_one(days, sz, num)
-                    st_trend = '[' + '|'.join(map(str,trend)) + ']'
-                    row = [sz, num, st_trend]
-                    fwriter.writerow(row)
-                    print('Done')
+            for (_,sz,num), trend in zip(sizes_and_nums, trendAll):
+                st_trend = '[' + '|'.join(map(str,trend)) + ']'
+                row = [sz, num, st_trend]
+                fwriter.writerow(row)
+                print(f'Completed simuation with size={sz} and num_events={num}')
 
-    def gathering_plot(self, sizes=[50, 70], num_events=[10,20,30], filename='gathering_simulation.csv'):
-        plt.subplots(figsize=(10,6))
-        with open(filename, 'r') as csvfile:
+    def gathering_plot(self, input='gathering_simulation.csv', output='sizes_vs_nums.jpg'):
+        sz_set, num_set = set(), set()
+        with open(input, 'r') as csvfile:
             freader = csv.reader(csvfile)
             next(freader)
             grid = defaultdict(lambda: defaultdict(int))
             for row in freader:
                 sz = int(row[0])
                 num = int(row[1])
+                sz_set.add(sz)
+                num_set.add(num)
                 trend = eval(row[2].replace('|',','))
                 grid[sz][num] = max(trend)
+        sizes = sorted(sz_set)
+        num_events = sorted(num_set, reverse=True)
         outbreaks = np.array([[grid[sz][num] for num in num_events] for sz in sizes])
-        sns.heatmap(outbreaks, cmap='hot')
+        plt.subplots(figsize=(10,6))
+        ax = sns.heatmap(outbreaks, cmap='coolwarm')
+        plt.xlabel('Event Sizes')
+        ax.set_xticklabels(sizes)
+        plt.ylabel('Number of Events')
+        ax.set_yticklabels(num_events)
+        plt.savefig('sizes_vs_nums.jpg')
+        plt.show()
 
 if __name__ == '__main__':
     model = NetworkModel('output/network_data.json')
-    # model.gathering_simulation()
+    model.gathering_simulation()
     model.gathering_plot()
     
